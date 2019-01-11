@@ -1,0 +1,231 @@
+from keras.applications import MobileNet
+from keras.applications import nasnet
+from keras.preprocessing.image import img_to_array
+from keras.applications import imagenet_utils
+import tensorflow as tf
+from PIL import Image
+import numpy as np
+import flask
+import io
+import time
+import datetime
+import argparse
+# for production level please checkout https://stackoverflow.com/questions/12269537/is-the-server-bundled-with-flask-safe-to-use-in-production
+# http://flask.pocoo.org/docs/1.0/deploying/
+
+
+app = flask.Flask(__name__)
+model = {'classify':None,
+         'detect':None}
+
+AVAIL_CMODEL = ['mobilenet','nasnetmobile','nasnetlarge','none']
+AVAIL_DMODEL = ['mobilenetv2ssd']
+
+def getcoco():
+    coco_dir = 'model/coco.names'
+    with open(coco_dir, 'r') as f:
+        coco = f.read().split()
+    return coco
+
+class DetectionModel():
+    def __init__(self, frozen_graph):
+        self.inputs = [] 
+        self.outputs = []
+        self.model = None 
+        self.load_model(frozen_graph) 
+    def load_model(self, frozen_graph):
+        if frozen_graph == AVAIL_DMODEL[0]:
+            self.labels = getcoco()
+            with tf.Graph().as_default() as gdet:
+                # [DEBUG] with tf.variable_scope("det"):
+                gdef = tf.GraphDef()
+                with open("./model/mobilenetv2ssd_coco.pb", "rb") as f:
+                    data = f.read()
+                    gdef.ParseFromString(data)
+                tf.import_graph_def(gdef, name='det')
+                config = tf.ConfigProto()
+                config.gpu_options.per_process_gpu_memory_fraction = 0.8
+                self.model = tf.Session(config=config, graph=gdet)
+                # [DEBUG] print('  \n'.join([i.name for i in self.model.graph.get_operations()]))
+                self.inputs = ["det/image_tensor:0"]
+                self.outputs = ["det/detection_classes:0","det/detection_boxes:0","det/detection_scores:0","det/num_detections:0"]
+
+    def predict(self, img): 
+        return self.model.run(self.outputs, feed_dict={self.inputs[0]:img})
+
+def argpaser_get():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-cm', default='mobilenet', type=str, help='classification model name: mobilenet/nasnetlarge/nasnetmobile')
+    parser.add_argument('-dm', default='mobilenetv2ssd', type=str, help='detection model name: mobilenetv2ssd')
+    args = parser.parse_args()
+    if args.cm is not None:
+        assert args.cm in AVAIL_CMODEL, 'not aviable model selected'
+    if args.dm is not None:
+        assert args.dm in AVAIL_DMODEL, 'not avaible model selected'
+    return args
+
+def load_model(args):
+    # load the pre-trained Keras model (here we are using a model
+    # pre-trained on ImageNet and provided by Keras, but you can
+    # substitute in your own networks just as easily)
+    global model
+ 
+    if args.cm is not None:
+        if args.cm == 'mobilenet':
+            Model = MobileNet
+        elif args.cm == 'nasnetlarge':
+            Model = nasnet.NASNetLarge
+        elif args.cm == 'nasnetmobile':
+            Model = nasnet.NASNetMobile
+        model['classify'] = Model(weights="imagenet")
+        model['classify']._make_predict_function() # https://github.com/keras-team/keras/issues/6462
+    if args.dm is not None:
+        if args.dm == 'mobilenetv2ssd':
+            Model = DetectionModel(args.dm)
+        model['detect'] = Model
+
+def prepare_image(image, target, keep=None):
+    # if the image mode is not RGB, convert it
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+
+    # resize the input image and preprocess it
+    image = image.resize(target)
+    image = np.array(image)
+    if keep==None:
+        image = np.expand_dims(image, axis=0).astype(float)/255.
+    else:
+        image = np.expand_dims(image, axis=0)
+    #image = img_to_array(image)
+    #image = np.expand_dims(image, axis=0)
+    #image = imagenet_utils.preprocess_input(image)
+
+    # return the processed image
+    return image
+
+@app.route("/classify", methods=["POST"])
+def classify():
+    # initialize the data dictionary that will be returned from the
+    # view
+    data = {"success": False}
+
+    # ensure an image was properly uploaded to our endpoint
+    if flask.request.method == "POST":
+        if flask.request.files.get("image"):
+            # read the image in PIL format
+            image = flask.request.files["image"].read()
+            image = Image.open(io.BytesIO(image))
+            # preprocess the image and prepare it for classification
+            image = prepare_image(image, target=(224, 224))
+
+            # classify the input image and then initialize the list
+            # of predictions to return to the client
+            ti  = time.time()
+            date_time = datetime.datetime.now()
+            preds = model['classify'].predict(image)
+            toc = time.time() - ti
+            results = imagenet_utils.decode_predictions(preds)
+            data["predictions"] = []
+
+            # loop over the results and add them to the list of
+            # returned predictions
+            for (imagenetID, label, prob) in results[0]:
+                r = {"label": label, "probability": float(prob)}
+                data["predictions"].append(r)
+
+            # indicate that the request was a success
+            data["success"] = True
+            print('[INFO] %s time taken for prediction: %.4f sec' % ( date_time, toc ))
+    # return the data dictionary as a JSON response
+    return flask.jsonify(data)
+
+@app.route("/detect", methods=["POST"])
+def detect():
+    # initialize the data dictionary that will be returned from the
+    # view
+    data = {"success": False}
+
+    # ensure an image was properly uploaded to our endpoint
+    if flask.request.method == "POST":
+        if flask.request.files.get("image"):
+            # read the image in PIL format
+            image = flask.request.files["image"].read()
+            image = Image.open(io.BytesIO(image))
+
+            # preprocess the image and prepare it for classification
+            image = prepare_image(image, target=(224, 224), keep=1)
+
+            # detect the input image and then initialize the list
+            # of predictions to return to the client
+            ti  = time.time()
+            date_time = datetime.datetime.now()
+            preds = model['detect'].predict(image)
+            toc = time.time() - ti
+            # print(['[*] result'], [i for i in preds])
+            # results = imagenet_utils.decode_predictions(preds)
+            data["predictions"] = []
+
+            # loop over the results and add them to the list of
+            # returned predictions
+            for idx in range(int(preds[3])):
+                label_id = int(preds[0][0, idx])-1
+                r = {"label": model['detect'].labels[label_id], "probability": float(preds[2][0, idx]), 
+                     "box": [float(i) for i in preds[1][0, idx, :]]}
+                data["predictions"].append(r)
+            # indicate that the request was a success
+            data["success"] = True
+            print('[INFO] %s time taken for prediction: %.4f sec' % ( date_time, toc ))
+    # return the data dictionary as a JSON response
+    return flask.jsonify(data)
+
+if __name__ == "__main__":
+    print(("* Loading Keras model and Flask starting server..."
+        "please wait until server has fully started"))
+    
+    load_model(argpaser_get())
+    IP = '0.0.0.0'
+    PORT = 5000
+    app.run(host=IP, port=PORT)
+
+
+# import the necessary packages
+import requests
+import argparse
+import time
+import datetime
+# initialize the Keras REST API endpoint URL along with the input
+# image path
+KERAS_REST_API_URL = "http://localhost:5000/predict"
+IMAGE_DIR = 'dog.jpg'
+
+
+def getparse():
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-i', type=str, default=IMAGE_DIR, help='input image dir')
+	parser.add_argument('-u', type=str, default=KERAS_REST_API_URL, help='rest service ip')
+	return parser.parse_args()
+
+# load the input image and construct the payload for the request
+def POST(args):
+	image = open(args.i, "rb").read()
+	payload = {"image": image}
+
+	# submit the request
+	ti = time.time()
+	r = requests.post(args.u, files=payload).json()
+	toc = time.time() - ti
+	# ensure the request was successful
+	if r["success"]:
+	    # loop over the predictions and display them
+	    for (i, result) in enumerate(r["predictions"]):
+	        print("{}. {}: {:.4f}".format(i + 1, result["label"],
+	            result["probability"]))
+	# otherwise, the request failed
+	else:
+	    print("Request failed")
+	print("[INFO] TIME: %s Total time needed to response: %.4f sec" % (datetime.datetime.now(), toc))
+def main():
+	POST(getparse())
+
+if __name__ == '__main__':
+	main()
