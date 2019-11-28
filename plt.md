@@ -9,6 +9,7 @@ Reference
 * [add verticle line](https://matplotlib.org/3.1.1/api/axes_api.html#matplotlib.axes.Axes)  
 * [set title](https://stackoverflow.com/questions/12444716/how-do-i-set-the-figure-title-and-axes-labels-font-size-in-matplotlib)  
 * [put legend out of figure](https://kite.com/python/examples/4997/matplotlib-place-a-legend-outside-of-plot-axes)  
+* [grid plot](https://jakevdp.github.io/PythonDataScienceHandbook/05.12-gaussian-mixtures.html)  
 
 Below is the python script for animation   
 
@@ -83,4 +84,15 @@ class PLT(object):
         ax.set_position([box.x0, box.y0, box.width*0.85, box.height])
         plt.legend(('Predicted True', 'Predicted Wrong',*STATE.STATE_STR[:CLASS]),
                    loc=pos,bbox_to_anchor=(1,0.5))
+```
+
+```python
+def plot_digits(data):
+    fig, ax = plt.subplots(10, 10, figsize=(8, 8),
+                           subplot_kw=dict(xticks=[], yticks=[]))
+    fig.subplots_adjust(hspace=0.05, wspace=0.05)
+    for i, axi in enumerate(ax.flat):
+        im = axi.imshow(data[i].reshape(8, 8), cmap='binary')
+        im.set_clim(0, 16)
+plot_digits(digits.data)
 ```
