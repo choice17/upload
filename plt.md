@@ -8,6 +8,7 @@ Reference
 * [add mouse callback](https://stackoverflow.com/questions/25521120/store-mouse-click-event-coordinates-with-matplotlib)  
 * [add verticle line](https://matplotlib.org/3.1.1/api/axes_api.html#matplotlib.axes.Axes)  
 * [set title](https://stackoverflow.com/questions/12444716/how-do-i-set-the-figure-title-and-axes-labels-font-size-in-matplotlib)  
+* [put legend out of figure](https://kite.com/python/examples/4997/matplotlib-place-a-legend-outside-of-plot-axes)  
 
 Below is the python script for animation   
 
@@ -74,4 +75,12 @@ class PLT(object):
 		self.fig.canvas.draw()
 		self.fig.suptitle(self.title, fontsize=12)
 		plt.show()
+```
+
+```python  
+	"""get the axis position and set the position and put legend position"""
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width*0.85, box.height])
+        plt.legend(('Predicted True', 'Predicted Wrong',*STATE.STATE_STR[:CLASS]),
+                   loc=pos,bbox_to_anchor=(1,0.5))
 ```
