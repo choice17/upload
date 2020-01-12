@@ -1,0 +1,209 @@
+/* Makefile */
+SRCS=node.c shd.c
+OBJS=node.o shd.o
+BIN=app
+
+all: $(BIN)
+
+$(BIN): $(OBJS)
+	gcc -g -O2 -Wall -o $@ $^ -I.
+
+%.o: %.c
+	gcc -g -O2 -Wall -c $< -o $@ -I.
+
+
+
+/* node.h */
+#ifndef NODE_H_
+#define NODE_H_
+
+typedef struct Node {
+    struct Node *next;
+    struct Node *prev;
+    void *ctx;
+    int id;
+} Node;
+
+typedef struct {
+    Node *head;
+    Node *bottom;
+    int num;
+} LIST_S;
+
+void append(LIST_S *list, void *ctx, int id);
+void *get_item_by_index(LIST_S *list, int index);
+void *get_item(LIST_S *list, int id);
+void *pop(LIST_S *list);
+void *pop_by_id(LIST_S *list, int id);
+void loop_list(LIST_S *list, void *funptr(void *, void *, void *), void *data, void *args);
+#endif /* NODE_H_ */
+
+
+/* node.c */
+#include "node.h"
+#include "stdlib.h"
+#include "stdio.h"
+
+static inline Node *newItem(void)
+{
+    return malloc(sizeof(Node));
+}
+
+static inline void freeItem(Node *item)
+{
+    free(item->ctx);
+    free(item);
+}
+
+void append(LIST_S *list, void *ctx, int id)
+{
+    Node *item = newItem();
+    item->ctx = ctx;
+    item->id = id;
+    item->prev = list->bottom;
+    item->next = NULL;
+    if (list->num)
+        list->bottom->next = item;
+    else {
+        list->head = item;
+        list->bottom = item;
+    }
+    list->num++;
+}
+
+void *get_item_by_index(LIST_S *list, int index)
+{
+    int i;
+    Node *cur = list->head;
+    if (index < list->num)
+        return NULL;
+    for (i = 0; i < index; i++)
+        cur = cur->next;
+    return cur->ctx;
+}
+
+void *get_item(LIST_S *list, int id)
+{
+    int i;
+    Node *cur = list->head;
+    for (i = 0; i < list->num; i++) {
+        if (cur == NULL)
+            return NULL;
+        if (cur->id == id) {
+            return cur->ctx;
+        }
+        cur = cur->next;
+    }
+    return NULL;
+}
+
+void *pop(LIST_S *list)
+{
+    Node *cur = list->bottom;
+    void *ctx = cur->ctx;
+    if (cur->prev != NULL)
+        cur->prev->next = NULL;
+    free(cur);
+    list->num--;
+    return ctx;
+}
+
+void *pop_by_id(LIST_S *list, int id)
+{
+    int i;
+    Node *cur = list->head;
+    void *ctx;
+    for (i = 0; i < list->num; i++) {
+        if (cur == NULL)
+            return NULL;
+        if (cur->id == id) {
+            ctx = cur->ctx;
+            if (cur->prev != NULL)
+                cur->prev->next = NULL;
+            free(cur);
+            list->num--;
+            return ctx;
+        }
+        cur = cur->next;
+    }
+    return NULL;
+}
+
+void loop_list(LIST_S *list, void *funptr(void *, void *, void *), void *data, void *args)
+{
+    int i;
+    Node *cur = list->head;
+    for (i = 0; i < list->num; i++) {
+        if (cur == NULL)
+            return;
+        funptr(cur->ctx, data, args);
+        cur = cur->next;
+    }
+}
+
+
+
+/* main.c */
+
+#include "node.h"
+#include "stdlib.h"
+#include "stdio.h"
+
+#define OBJ_INDEX_NUM 30
+
+
+
+typedef struct {
+    int sx;
+    int sy;
+    int ex;
+    int ey;
+} RECT_S;
+
+typedef struct {
+    int w;
+    int h;
+} SIZE_S;
+
+typedef struct {
+    SIZE_S size;
+    RECT_S track_reg;
+    int id;
+} SHD_LT_ATTR_S;
+
+typedef struct {
+    SHD_LT_ATTR_S obj[OBJ_INDEX_NUM];
+} SHD_LT_LIST_S;
+
+void print(void *ctx, void *data, void *args)
+{
+    SHD_LT_ATTR_S *obj = (SHD_LT_ATTR_S *)(ctx);
+    printf("shd attri: size:(%d %d), obj:(%d %d %d %d) id:%d\n",
+        obj->size.w, obj->size.h, obj->track_reg.sx, 
+        obj->track_reg.sy,
+        obj->track_reg.ex,
+        obj->track_reg.ey, obj->id);
+}
+
+
+int main(int argc, char const *argv[])
+{
+    SHD_LT_LIST_S list;
+    list.obj[0].size = (SIZE_S) {12, 13};
+    list.obj[0].track_reg = (RECT_S) {12, 13};
+    list.obj[0].id = 0;
+    list.obj[1].size = (SIZE_S) {32, 13};
+    list.obj[1].track_reg = (RECT_S) {19, 1200};
+    list.obj[1].id = 1;
+    
+    LIST_S li;
+    li.head = NULL;
+    li.bottom = NULL;
+    li.num = 0;
+    append(&li, &list.obj[0], 0);
+    append(&li, &list.obj[1], 1);
+    printf("li num:%d\n", li.num);
+    loop_list(&li, (void *)&print, NULL, NULL);
+
+    return 0;
+}
