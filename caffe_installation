@@ -1,0 +1,47 @@
+0. create local conda env
+0.a cd /users/im147/env
+0.b conda create -p py36 python=3.6.10
+0.c conda install tensorflow-gpu==1.14.0 numpy ; pip install flask requests opencv-python=3.4.1.15 sklearn imutils matplotlib pillow progressbar
+
+# For caffe
+1. create local path for library installation
+1.a cd /user/im147/local/libs
+1.b install protobuf
+1.b.1 git clone https://github.com/protocolbuffers/protobuf.git
+1.b.2 mv protobuf protobuf_
+1.b.3 cd protobuf_
+1.b.4 git co v3.11.4 (refer to caffe version after build record .build_release/src/caffe/proto/caffe.pb.h)
+1.b.5 ./autogen.sh
+1.b.6 ./configure --prefix $(YOUR_PATH)/local/libs/protobuf
+1.b.7 make -j8; make install
+1.b.8 PROTOBUF_PATH=$(YOUR_PATH)/local/libs/protobuf PROTOBUF_INC=$(PROTOBUF_PATH)/include PROTOBUF_LIB_PATH=$(PROTOBUF_PATH)/lib
+
+# For caffe
+2. git clone caffe-philhr repo git@gitlab.augentix.com:deep_learning/caffe-philkr.git 
+2.a git co augentix_master
+2.b cp Makefile.config.example Makefile.config
+2.c Makefile.config
+
+USER_CUDNN:=1 WITH_PYTHON_LAYER:=1 CUDA_ARCH:= no compute_20 
+/* python.h & arrayobject.h */
+PYTHON_INCLUDE := your-conda-env-python/ your-conda-env-numpy-core/
+PYTHON_LIBRARIES:= boost_python-py35 python3.6m
+PYTHON_LIB := your-conda-env-python /usr/lib/x86_64-linux-gnu/
+
+INCLUDE_DIRS := $(PROTOBUF_INC) <-- first
+LIBRARY_DIRS := $(PROTOBUF_LIB_PATH) <-- first
+
+2.d Makefile
+
+add c++11 flags
+CXXFLAGS += -std=c++11
+NVCCFLAGS += -std=c++11
+LINKFLAGS += -std=c++11
+
+
+related setup issue
+https://github.com/BVLC/caffe/issues/6359
+
+
+
+
