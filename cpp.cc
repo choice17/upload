@@ -15,6 +15,8 @@ https://www.w3schools.com/cpp/
 13. include <cstdio> / <cstring> / <cstdlib> / <cstdint>
 14. unnamed scope resolution
 15. runtime polymorphism
+16. class static variable
+17. delete[] operator for heap array
 */
 
 #include <iostream>
@@ -105,11 +107,25 @@ void *app(void)
     return b.get();
 }
 
+class TEST
+{
+public:
+    static int cnt;
+    TEST(){cnt++; x = cnt;}
+    ~TEST(){cout << "delete " << x << endl;}
+    int x;
+};
+
+int TEST::cnt = 0; // must init outside class definition
+
 int main(void)
 {
     auto c = app();
     int g_x = 4; //local scope 
     cout << c << " " << (static_cast<TF::Inter*>(c))->m_a << endl;
     cout << ::g_x << " global vs local " << g_x << endl;
+    
+    TEST *t = new TEST[10];
+    delete[] t; // array delete operator
     return 0;
 }
