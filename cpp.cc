@@ -12,6 +12,8 @@
 11. static class function
 12. pass by reference
 13. include <cstdio> / <cstring> / <cstdlib> / <cstdint>
+14. unnamed scope resolution
+15. runtime polymorphism
 */
 
 #include <iostream>
@@ -20,7 +22,14 @@
 using namespace std;
 
 namespace TF {
-class Inter{
+class Base{
+public:
+    Base(){};
+    ~Base(){};
+    virtual void echo(void){ cout << "I am from base class!" << endl; }
+};
+
+class Inter: public Base{
 public:
     // member variable
     int m_a;
@@ -36,6 +45,9 @@ public:
     static void zero(Inter& x) { x.m_a = 0;};
     // friend function -> able to access private/protected member variable  but the definition is outside class scope
     friend void print(const Inter& x);
+    
+    void echo(void){cout << "I am from Inter class\n";}
+    
 private:
     // member variable can only be accessed by in class function
     int m_b;
@@ -53,6 +65,8 @@ void TF::Inter::operator +=(const Inter& x)
 
 } // TF
 
+int g_x = 3;
+
 unique_ptr<TF::Inter> get_ptr(void)
 {
     #if 0
@@ -69,10 +83,18 @@ unique_ptr<TF::Inter> get_ptr(void)
 void *app(void)
 {
     //auto b = get_ptr();
+    TF::Base _base;
+    TF::Base* _bptr;
     TF::Inter _a, _b;
     _b.m_a = 10;
     _a.m_a = 6;
     _a += _b;
+    
+    // test for runtime polymorphism
+    _bptr = &_base;
+    _bptr->echo();
+    _bptr = &_a;
+    _bptr->echo();
     auto b = get_ptr();
     b->m_a = _a.m_a;
     cout <<  b.get() <<  " " << __func__ <<  " " << b->m_a << " sq:" << TF::Inter::sq<int>(*(b.get())) << endl;
@@ -85,6 +107,8 @@ void *app(void)
 int main(void)
 {
     auto c = app();
+    int g_x = 4; //local scope 
     cout << c << " " << (static_cast<TF::Inter*>(c))->m_a << endl;
+    cout << ::g_x << " global vs local " << g_x << endl;
     return 0;
 }
