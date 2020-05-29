@@ -1,0 +1,206 @@
+## reference
+
+github armnn materials
+Configuring the Arm NN SDK build environment for TensorFlow Lite.pdf
+Configuring the Arm NN SDK build environment for Caffe.pdf
+Configuring the Arm NN SDK build environment for ONNX.pdf
+Configuring the Arm NN SDK build environment for TensorFlow.pdf
+
+BuildGuideCrossCompilation.md
+
+## git clone the required package
+
+	cd $(workspace)
+	git clone https://github.com/ARM-software/armnn.git
+	git co branches/armnn_19_11
+	git clone https://github.com/ARM-software/ComputeLibrary.git
+  git co v19.11.1
+	wget https://dl.bintray.com/boostorg/release/1.64.0/source/boost_1_64_0.tar.bz2
+	tar xf boost_1_64_0.tar.bz2
+	git clone -b v3.5.0 https://github.com/protocolbuffers/protobuf.git
+	git clone https://github.com/tensorflow/tensorflow.git
+	git co a0043f9262dc1b
+	git clone https://github.com/google/flatbuffers.git
+
+	export ONNX_ML=1
+	git clone --recursive https://github.com/onnx/onnx.git
+	unset ONNX_ML
+	cd onnx
+	git co f612532843bd8e24
+
+mkdir $HOME/local/libs/armnn-devenv
+export ARMNN_ENV=$HOME/local/libs/armnn-devenv
+
+## Compute library
+
+	$ cd ${PATH}/ComputeLibrary
+	$ scons arch=armv7a neon=1 opencl=0 embed_kernels=1 extra_cxx_flags="-fPIC" -j8 internal_only=0
+
+	DEST=$ARMNN_ENV/ComputerLibrary
+	install dir
+	cp build/*.so build/*.a include LICENSE scripts README.md to $DEST
+	
+
+## Boost
+
+	$ cd ${DOWNLOAD}/Boost
+	1. echo "using gcc : arm : arm-linux-gnueabihf-g++ ;" > user_config.jam
+	2. ./bootstrap.sh -prefix=${ARMNN_ENV}/boost_armv7a_install
+	3. ./b2 install address-model=32 toolset=gcc-arm link=static cxxflags=-fPIC --with-filesystem --with-test --with-log --with-program_options -j32 --user-config=user_config.jam -a
+
+## protobuf
+	
+	./autogen.sh
+	// git co >= 3.7.0 (to avoid port_def.inc problem)   need to greater than 3.5.0
+	Build a native (x86_64) version of the protobuf libraries and compiler (protoc):
+    ```
+    mkdir x86_64_build
+    cd x86_64_build
+    ../configure --prefix=$ARMNN_ENV/protobuf/x86_64_pb_install
+    make install -j8
+    cd ..
+    ```
+	Build the arm version of the protobuf libraries:
+    ```
+    mkdir armhf_build
+    cd armhf_build
+    CC=arm-linux-gnueabihf-gcc \
+    CXX=arm-linux-gnueabihf-g++ \
+    ../configure --host=arm-linux \
+    --prefix=$ARMNN_ENV/protobuf/armhf_pb_install \
+    --with-protoc=$ARMNN_ENV/protobuf/x86_64_pb_install/bin/protoc
+    make install -j8
+    cd ..
+    ```
+    ```
+    CC=arm-linux-gnueabihf-gcc \
+    CXX=arm-linux-gnueabihf-g++ \
+	  ./configure --host=arm-linux --prefix=$ARMNN_ENV/armhf_pb_install 
+    make -j16
+    ```
+
+## flatbuffer
+
+	1. cd $BASEDIR/flatbuffers
+	2. Modify CMakeLists.txt
+	-          COMMAND "${FLATBUFFERS_FLATC_EXECUTABLE}"
+	+          COMMAND qemu-arm -L /usr/arm-linux-gnueabihf "${FLATBUFFERS_FLATC_EXECUTABLE}"
+	3. CXX=arm-linux-gnueabihf-g++ CC=arm-linux-gnueabihf-gcc cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-fPIC -DCMAKE_CXX_FLAGS=-fPIC
+	4. make -j8
+
+## tensorflow protobuff library
+
+	cd ${DOWNLOAD}/tensorflow
+	{ARMNN_PATH}/scripts/generate_tensorflow_protobuf.sh <gen_output_library_src> <google protoc binary path>
+
+## caffe protobuff library
+
+	copy Makefile.config.example to Makefile.config
+
+	USER_CUDNN:=1 WITH_PYTHON_LAYER:=1 CUDA_ARCH:= no compute_20  for cuda 10.1
+	/* python.h & arrayobject.h */
+	PYTHON_INCLUDE := your-conda-env-python/ your-conda-env-numpy-core/ path-to-/usr/include/hdf5/serial
+	PYTHON_LIBRARIES:= boost_python-py35 python3.6m
+	PYTHON_LIB := your-conda-env-python/lib /usr/lib/x86_64-linux-gnu/
+
+	INCLUDE_DIRS := $(PYTHON_INC) /usr/local/include /usr/include/hdf5/serial $(PROTOBUF_INC) <-- first
+	LIBRARY_DIRS := $(PYTHON_LIB) /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu/hdf5/serial/ $(PROTOBUF_LIB_PATH) <-- first
+
+	2.d Makefile
+
+	add c++11 flags
+	CXXFLAGS += -std=c++11
+	NVCCFLAGS += -std=c++11
+	LINKFLAGS += -std=c++11
+
+## onnx library
+
+	cd <BASE_DIR>
+	export ONNX_ML=1 # to clone ONNX with its ML extension
+	git clone --recursive https://github.com/onnx/onnx.git
+	unset ONNX_ML
+
+	cd <ONNX_DIR>
+	git checkout f612532843bd8e24efeab2815e45b436479cc9ab
+	export LD_LIBRARY_PATH=${ARMNN_ENV}/armhf_pb_install/lib:$LD_LIBRARY_PATH
+
+	${ARMNN_ENV}/protobuf/x86_64_pb_install/bin/protoc onnx/onnx.proto --proto_path=. --proto_path=${ARMNN_ENV}/protobuf/x86_64_pb_install/include --cpp_out $ARMNN_ENV/onnx-protobuf
+
+## armnn
+
+	1. Modify src\armnnSerializer\CMakeLists.txt
+	-        COMMAND ${FLATC} -o ${CMAKE_CURRENT_BINARY_DIR} --cpp ${CMAKE_CURRENT_SOURCE_DIR}/ArmnnSchema.fbs
+	+        COMMAND qemu-arm -L /usr/arm-linux-gnueabihf ${FLATC} -o ${CMAKE_CURRENT_BINARY_DIR} --cpp ${CMAKE_CURRENT_SOURCE_DIR}/ArmnnSchema.fbs
+	2. sh run_hf.sh
+
+	HMPATH=/users/im147
+	WORKSPACE=$HMPATH/workspace
+	LIB_PATH=$HMPATH/local/libs
+	ARMNN_ENV=$LIB_PATH/armnn-devenv
+
+	/* makesure the path exists */
+	ls $CAFFE_PROTO_PATH && \
+	ls $TF_PROTO_PATH && \
+	ls $TF_LITE_SCHEMA_PATH && \
+	ls $ONNX_PROTO_PATH && \
+	ls $COMPUTE_ROOT_PATH && \
+	ls $COMPUTE_BUILD_PATH && \
+	ls $BOOST_PATH_ROOT_PATH && \
+	ls $FLATBUFFERS_ROOT_PATH && \
+	ls $FLATBUFFERS_LIBRARY_BIN && \
+	ls $FLATBUFFER_BIN && \
+	ls $PROTOBUF_PATH 
+
+	# CAFFE_PROTO_PATH=$LIB_PATH/caffe/.build_release/src/caffe/proto
+
+	CAFFE_PROTO_PATH=$ARMNN_ENV/caffe-protobuf/
+	TF_PROTO_PATH=$ARMNN_ENV/tensorflow-protobuf
+	TF_LITE_SCHEMA_PATH=$WORKSPACE/tensorflow/tensorflow/lite/schema
+	ONNX_PROTO_PATH=$ARMNN_ENV/onnx-protobuf/
+	COMPUTE_ROOT_PATH=$WORKSPACE/ComputeLibrary
+	COMPUTE_BUILD_PATH=$WORKSPACE/ComputeLibrary/build
+	BOOST_PATH_ROOT_PATH=$ARMNN_ENV/boost_armhf_install
+	FLATBUFFERS_ROOT_PATH=$ARMNN_ENV/armhf_flatbuffers_install
+	FLATBUFFERS_LIBRARY_BIN=$FLATBUFFERS_ROOT_PATH/lib/libflatbuffers.a
+	FLATBUFFER_BIN=$FLATBUFFERS_ROOT_PATH/bin/flatc
+	PROTOBUF_PATH=$ARMNN_ENV/protobuf/armhf_pb_install
+
+	CXX=arm-linux-gnueabihf-g++ \
+	CC=arm-linux-gnueabihf-gcc \
+	cmake .. \
+	-DCMAKE_C_FLAGS=-mfpu=neon \
+	-DCMAKE_CXX_FLAGS=-mfpu=neon \
+	-DARMCOMPUTE_ROOT=$COMPUTE_ROOT_PATH \
+	-DARMCOMPUTE_BUILD_DIR=$COMPUTE_BUILD_PATH \
+	-DBOOST_ROOT=$BOOST_PATH_ROOT_PATH/ \
+	-DARMCOMPUTENEON=1 -DARMCOMPUTECL=0 -DARMNNREF=1 \
+	-DCAFFE_GENERATED_SOURCES=$CAFFE_PROTO_PATH \
+	-DBUILD_CAFFE_PARSER=1 \
+	-DTF_GENERATED_SOURCES=$TF_PROTO_PATH \
+	-DBUILD_TF_PARSER=1 \
+	-DTF_LITE_GENERATED_PATH=$TF_LITE_SCHEMA_PATH \
+	-DFLATBUFFERS_ROOT=$FLATBUFFERS_ROOT_PATH \
+	-DFLATBUFFERS_LIBRARY=$FLATBUFFERS_LIBRARY_BIN \
+	-DBUILD_TF_LITE_PARSER=1 \
+	-DFLATC_DIR=$FLATBUFFER_BIN \
+	-DFLATC=$FLATBUFFER_BIN \
+	-DBUILD_ONNX_PARSER=1 \
+	-DONNX_GENERATED_SOURCES=$ONNX_PROTO_PATH \
+	-DBUILD_ARMNN_SERIALIZER=1 \
+	-DBUILD_ARMNN_QUANTIZER=1 \
+	-DPROTOBUF_ROOT=$PROTOBUF_PATH \
+	-DBUILD_SAMPLE_APP=1 \
+	-DCMAKE_INSTALL_PREFIX=$ARMNN_ENV/armnn \
+
+	make -j8
+
+## run on fpga
+
+	mount -t nfs -o port=2049,nolock 192.168.10.119:/usbnfs /run
+	cd /run/build
+	chmod 755 ./UnitTests
+	chmod 777 ./lib/*
+	cp ./lib/* /lib
+	export LD_LIBRARY_PATH=`pwd`
+	ln -s libprotobuf.so.15.0.1 ./libprotobuf.so.15
+	./UnitTests
