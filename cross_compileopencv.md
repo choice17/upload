@@ -58,6 +58,13 @@ WITH_TIFF,
 WITH_WEBP
 ```
 
+Add c/cpp flag
+```
+CMAKE_EXE_LINKER_FLAGS= -lpthread -ldl -lrt
+CMAKE_C_FLAGS = -DWITH_PARALLEL_PF=OFF
+CMAKE_CXX_FALGS = -DWITH_PARALLEL_PF=OFF -DHAVE_PTHREAD=1
+```
+
 Add install prefix
 ```
 CMAKE_INSTALL_PREFIX = /usr/local/opencv
