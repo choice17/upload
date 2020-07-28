@@ -1,0 +1,45 @@
+import torch
+from torch import nn
+import tensorflow.keras.layers as L
+
+weight = np.random.rand(16,3,3,3).astype(np.float32)
+x = np.random.rand(1,4,5,3).astype(np.float32)
+
+class TModel(nn.Module):
+    def __init__(self):
+        super(TModel, self).__init__()
+        self.conv = nn.Conv2d(3,16,1,1,1, bias=False)
+    def forward(self, x):
+        return self.conv(x)
+
+class KModel:
+    def __init__(self):
+        self.conv = L.Conv2D(16,3,1,"same", use_bias=False)
+    def __call__(self, x):
+        y = self.conv(x)
+        return Model(x, y)
+
+
+tm = TModel()
+tx = torch.from_numpy(x.transpose(0,3,1,2))
+
+tm.conv.weight.data = nn.Parameter(torch.tensor(weight,dtype=torch.float32))
+
+ty = tm(tx)
+
+kx_ = L.Input((None,None,3))
+km = KModel()(kx_)
+
+sess = tf.compat.v1.keras.backend.get_session()
+assign = km.weights[0].assign(weight.transpose(2,3,1,0))
+_ = sess.run(assign)
+
+ky = km.predict(x)
+
+x.shape
+
+print(ty.shape, ky.shape)
+
+print(ty.detach().numpy().transpose(0,2,3,1)[0,:,:,0])
+
+print(ky[0,:,:,0])
