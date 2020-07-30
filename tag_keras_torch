@@ -43,3 +43,108 @@ print(ty.shape, ky.shape)
 print(ty.detach().numpy().transpose(0,2,3,1)[0,:,:,0])
 
 print(ky[0,:,:,0])
+
+
+
+
+# check for different
+
+import tensorflow as tf
+import tensorflow.keras.layers as L
+from tensorflow.keras import Model as KModel
+import torch.nn as nn
+import torch
+
+def KM():
+    x = L.Input((None,None,3))
+    y0 = L.Concatenate(axis=-1)([x[:,::2,::2,:],x[:,::2,1::2,:],x[:,1::2,::2,:],x[:,1::2,1::2,:]])
+    y1 = L.Conv2D(32,3,1,"same",use_bias=False)(y0)
+    y2 = L.BatchNormalization()(y1)
+    y3 = L.LeakyReLU(0.1)(y2)
+    return KModel(x, [y1, y2, y3])
+
+class YM(nn.Module):
+    def __init__(self):
+        super(YM, self).__init__()
+        self.cat = lambda x : torch.cat([x[:,:,::2,::2],x[:,:,::2,1::2],x[:,:,1::2,::2],x[:,:,1::2,1::2]],axis=1)
+        self.conv = nn.Conv2d(12,32,3,1,1,bias=False)
+        self.bn = nn.BatchNorm2d(32)
+        self.act = nn.LeakyReLU(0.1)
+
+    def forward(self, x):
+        xx = torch.cat([x[:,:,::2,::2],x[:,:,::2,1::2],x[:,:,1::2,::2],x[:,:,1::2,1::2]],axis=1)
+        return self.act(self.bn(self.conv(xx)))
+
+def Ym(ym, x):
+    y0 = ym.cat(x)
+    y0 = ym.conv(y0)
+    y1 = ym.bn(y0)
+    y2 = ym.act(y1)
+    return [y0, y1, y2]
+
+
+
+img = np.random.randint(0,255,(1,12,14,3)).astype(np.float32)
+img_torch = torch.from_numpy(img.transpose(0,3,1,2).astype(np.float32))
+w1 = np.random.rand(32,12,3,3).astype(np.float32)*0.1
+bw1 = np.random.rand(32).astype(np.float32)*0.1
+bb1 = np.random.rand(32).astype(np.float32)
+bm1 = np.random.rand(32).astype(np.float32)
+bv1 = np.abs(np.random.rand(32).astype(np.float32))*0.1
+
+ym = YM()
+km = KM()
+
+#del ym, km
+
+ym.conv.weight = nn.Parameter(torch.from_numpy(w1))
+ym.bn.weight = nn.Parameter(torch.from_numpy(bw1))
+ym.bn.bias = nn.Parameter(torch.from_numpy(bb1))
+ym.bn.running_mean = torch.from_numpy(bm1)
+ym.bn.running_var = torch.from_numpy(bb1)
+
+km.layers[6].set_weights([w1.transpose(2,3,1,0)])
+km.layers[7].set_weights([bw1, bb1, bm1, bv1])
+
+ym.eval()
+ym.bn.track_running_stats = True
+with torch.no_grad():
+    t0 = Ym(ym, img_torch/255.-0.5)
+k0 = km.predict(img/255.-0.5)
+
+for i in range(len(t0)):
+    print(t0[i].shape, k0[i].shape)
+
+Key = 1
+print(t0[Key][0,0,:,:].detach().numpy())
+print(k0[Key][0,:,:,0])
+
+gamma, beta = bw1[0], bb1[0]
+mu, var = bm1[0], bv1[0]
+x_p = t0[0][0,0,0,0]
+
+print(gamma,beta,mu,var,x_p)
+
+eps = 1e-10
+def bn0(x_p, mu, var, gamma, beta):
+    xhat = (x_p - mu)/np.sqrt(var + eps)
+    _x = xhat * gamma + beta
+    return _x
+def bn1(x_p, mu, var, gamma, beta):
+    inv_var = 1/ np.sqrt(var + eps)
+    alpha_d = gamma * inv_var
+    beta_d = beta - mu * inv_var * gamma
+    return x_p * alpha_d + beta_d
+
+def bn2(x_p, mu, var, gamma, beta):
+    xhat = (x_p - mu)*np.sqrt(var + eps)
+    _x = xhat * gamma + beta
+    return _x
+
+print(bn0(x_p, mu, var, gamma, beta))
+print(bn1(x_p, mu, var, gamma, beta))
+print(bn2(x_p, mu, var, gamma, beta))
+
+
+
+
