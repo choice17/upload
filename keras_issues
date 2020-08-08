@@ -1,0 +1,42 @@
+# cannot_create_group
+ValueError: Unable to create group (Name already exists) with model.save_weights()
+https://github.com/keras-team/keras/issues/12195
+$CUSTOM_PATH/tensorflow_core/python/keras/saving/hdf5_format.py
+
+Function: save_weights_to_hdf5_group
+
+ ```
+ for layer in layers:
+    g = f.create_group(layer.name)
+    weights = _legacy_weights(layer)
+    weight_values = K.batch_get_value(weights)
+    weight_names = [w.name.encode('utf8') for w in weights]
+    save_attributes_to_hdf5_group(g, 'weight_names', weight_names)
+    for name, val in zip(weight_names, weight_values):
+      param_dset = g.create_dataset(name, val.shape, dtype=val.dtype)
+      if not val.shape:
+        # scalar
+        param_dset[()] = val
+      else:
+        param_dset[:] = val
+```
+==>
+```
+sorted_layers = [(layers[i].name, i) for i in range(len(layers))]
+  sorted_layers.sort()
+
+  for sorted_layer_index in range(len(sorted_layers)):
+    layer = layers[sorted_layers[sorted_layer_index][1]]
+    g = f.create_group(layer.name)
+    weights = _legacy_weights(layer)
+    weight_values = K.batch_get_value(weights)
+    weight_names = [w.name.encode('utf8') for w in weights]
+    save_attributes_to_hdf5_group(g, 'weight_names', weight_names)
+    for name, val in zip(weight_names, weight_values):
+      param_dset = g.create_dataset(name, val.shape, dtype=val.dtype)
+      if not val.shape:
+        # scalar
+        param_dset[()] = val
+      else:
+        param_dset[:] = val
+```
