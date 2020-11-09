@@ -1,5 +1,7 @@
 // append lib search path for lib.pc
 list(APPEND CMAKE_PREFIX_PATH "/users/im147/local/libs/linux/pkg-config")
 
+list(APPEND CMAKE_LIBRARY_PATH "/users/im147/local/libs/window/pkgconfig")
+
 // ignore path
 list(APPEND CMAKE_IGNORE_PATH "/tools/")
