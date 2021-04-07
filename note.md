@@ -1,5 +1,11 @@
 ## note
 
+* 2021/4/7
+
+assembly in c
+1. https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html
+2. http://ibiblio.org/gferg/ldp/GCC-Inline-Assembly-HOWTO.html
+
 * 2021/4/5  
 
 hdmi to sunview - cropped (overscan option)  
