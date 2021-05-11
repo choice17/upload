@@ -1,5 +1,52 @@
 ## note
 
+* 2021/5/11
+
+@ build from source opencv with ffmpeg in linux  
+ref : https://stackoverflow.com/questions/12427928/configure-and-build-opencv-to-custom-ffmpeg-install
+```
+// modify ffmpeg cmake in opencv
+diff --git a/cmake/OpenCVFindLibsVideo.cmake b/cmake/OpenCVFindLibsVideo.cmake
+index 13b62ac..bab9df3 100644
+--- a/cmake/OpenCVFindLibsVideo.cmake
++++ b/cmake/OpenCVFindLibsVideo.cmake
+@@ -228,6 +228,12 @@ if(WITH_FFMPEG)
+     if(FFMPEG_libavresample_FOUND)
+       ocv_append_build_options(FFMPEG FFMPEG_libavresample)
+     endif()
++   CHECK_MODULE(libavcodec HAVE_FFMPEG)
++   CHECK_MODULE(libavformat HAVE_FFMPEG)
++   CHECK_MODULE(libavutil HAVE_FFMPEG)
++   CHECK_MODULE(libswscale HAVE_FFMPEG)
++   CHECK_MODULE(libswresample HAVE_FFMPEG)
++   CHECK_MODULE(libavresample HAVE_FFMPEG)
+     if(HAVE_FFMPEG)
+       try_compile(__VALID_FFMPEG
+           "${OpenCV_BINARY_DIR}"
+
+#!/bin/bash
+// export ld library path and pkgconfig path
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/Applications/ffmpeg/lib
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/Applications/ffmpeg/lib/pkgconfig
+export PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR:$HOME/Applications/ffmpeg/lib
+
+// cmake opencv
+cmake \
+    -D BUILD_EXAMPLES=ON \
+    -D BUILD_TESTS=OFF \
+    -D OPENCV_EXTRA_EXE_LINKER_FLAGS="-Wl,-rpath,$HOME/Applications/ffmpeg/lib" \
+    -D CMAKE_BUILD_TYPE=RELEASE \
+    -D CMAKE_INSTALL_PREFIX=$HOME/Applications/opencv \
+    /path/to/opencv
+
+// configure ffmpeg 
+cd ./ffmpeg_src
+./configure --enable-avresample --prefix=$(pwd)/linux_install --disable-doc --pkgconfigdir=$(pwd)/linux_install/lib/pkgconfig --enable-shared --enable-avresample
+```
+
+
+
+
 * 2021/4/9
 
 @ mouse control in python
