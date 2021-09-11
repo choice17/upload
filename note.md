@@ -4,14 +4,14 @@
 
 L1 norm encourages sparsity and L2 norm push weights to zero.
 
-https://www.kaggle.com/residentmario/l1-norms-versus-l2-norms
-https://stats.stackexchange.com/questions/45643/why-l1-norm-for-sparse-models
+https://www.kaggle.com/residentmario/l1-norms-versus-l2-norms   
+https://stats.stackexchange.com/questions/45643/why-l1-norm-for-sparse-models  
 
 * 2021/9/11
 
-tflite micro has better performance on memory usage/ library package size
-tflite has better control on speed
-tflite package size can be reduced by comment out unused ops. and other datatype.
+tflite micro has better performance on memory usage/ library package size  
+tflite has better control on speed    
+tflite package size can be reduced by comment out unused ops. and other datatype.  
 
 * 2021/5/11
 
