@@ -1,5 +1,12 @@
 ## note
 
+* 2021/12/22
+
+Show string array in shell scripts
+```bash
+printf ">[%s]\n" "${list[@]}"
+```
+
 * 2021/9/11
 
 L1 norm encourages sparsity and L2 norm push weights to zero.
